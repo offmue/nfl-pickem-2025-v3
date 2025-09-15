@@ -51,7 +51,7 @@ class User(db.Model):
         score = 0
         picks = Pick.query.filter_by(user_id=self.id).all()
         for pick in picks:
-            match = db.session.get(Match, pick.match_id)
+            match = Match.query.get(pick.match_id)
             if match and match.is_completed and match.winner_team_id == pick.chosen_team_id:
                 score += 1
         return score
@@ -294,7 +294,7 @@ def get_current_user():
         if not user_id:
             return jsonify({'error': 'Not authenticated'}), 401
         
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
@@ -377,11 +377,11 @@ def handle_picks():
                 return jsonify({'error': 'Match ID and chosen team ID required'}), 400
             
             # === BASIC VALIDATIONS ===
-            match = db.session.get(Match, match_id)
+            match = Match.query.get(match_id)
             if not match:
                 return jsonify({'error': 'Match not found'}), 404
             
-            team = db.session.get(Team, chosen_team_id)
+            team = Team.query.get(chosen_team_id)
             if not team:
                 return jsonify({'error': 'Team not found'}), 404
             
@@ -417,7 +417,7 @@ def handle_picks():
                 elimination_type='loser'
             ).first()
             if loser_eliminated:
-                opposing_team = db.session.get(Team, opposing_team_id)
+                opposing_team = Team.query.get(opposing_team_id)
                 return jsonify({'error': f'{opposing_team.name} cannot be picked as loser (already used 1x as loser)'}), 400
             
             # === USAGE LIMIT CHECKS ===
@@ -429,7 +429,7 @@ def handle_picks():
             # Check loser usage limit (max 1x)
             loser_usage = TeamLoserUsage.query.filter_by(user_id=user_id, team_id=opposing_team_id).first()
             if loser_usage:
-                opposing_team = db.session.get(Team, opposing_team_id)
+                opposing_team = Team.query.get(opposing_team_id)
                 return jsonify({'error': f'{opposing_team.name} has already been picked as loser this season'}), 400
             
             # === HANDLE PICK (CREATE OR UPDATE) ===
@@ -575,7 +575,7 @@ def get_user_scores():
             return jsonify({'error': 'User ID required'}), 400
             
         # Get the user
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
@@ -610,7 +610,7 @@ def get_recent_picks():
             return jsonify({'error': 'User ID required'}), 400
             
         # Get the user
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
@@ -629,8 +629,8 @@ def get_recent_picks():
             
             for pick in picks:
                 # Get team and match info
-                team = db.session.get(Team, pick.chosen_team_id)
-                match = db.session.get(Match, pick.match_id)
+                team = Team.query.get(pick.chosen_team_id)
+                match = Match.query.get(pick.match_id)
                 
                 # Calculate if pick is correct
                 is_correct = False
@@ -661,7 +661,7 @@ def get_eliminated_teams():
             return jsonify({'error': 'User ID required'}), 400
             
         # Get the user
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
@@ -670,7 +670,7 @@ def get_eliminated_teams():
         
         eliminated_list = []
         for elim_team in eliminated_teams:
-            team = db.session.get(Team, elim_team.team_id)
+            team = Team.query.get(elim_team.team_id)
             if team:
                 eliminated_list.append({
                     'id': team.id,
@@ -696,7 +696,7 @@ def get_team_winner_usage():
             return jsonify({'error': 'User ID required'}), 400
             
         # Get the user
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
@@ -744,7 +744,7 @@ def get_team_loser_usage():
             return jsonify({'error': 'User ID required'}), 400
             
         # Get the user
-        user = db.session.get(User, user_id)
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
             
@@ -925,11 +925,6 @@ def serve_static(path):
 # Initialize database
 with app.app_context():
     db.create_all()
-
-# Register Database Sync API
-from database_sync_api import register_database_sync_api
-register_database_sync_api(app)
-logger.info("Database Sync API registered successfully")
 
 # Start validation service
 try:

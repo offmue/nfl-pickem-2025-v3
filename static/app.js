@@ -15,7 +15,6 @@ async function initializeApp() {
     setupNavigation();
     setupModal();
     setupLoginForm();
-    initializePickModal(); // Add pick modal initialization
     await checkAuthStatus();
     await getCurrentWeek();
     loadDashboardData();
@@ -483,7 +482,7 @@ async function loadMatchesForWeek(week) {
         const hasWeekPick = picksData.picks.length > 0;
         const weekPickMatch = hasWeekPick ? picksData.picks[0].match : null;
         
-        // Get eliminated teams with type information
+        // Get eliminated teams
         const eliminatedResponse = await fetch(`${API_BASE}/api/picks/eliminated?user_id=${currentUser.id}`);
         
         if (!eliminatedResponse.ok) {
@@ -493,14 +492,7 @@ async function loadMatchesForWeek(week) {
         }
         
         const eliminatedData = await eliminatedResponse.json();
-        
-        // Separate eliminated teams by type
-        const winnerEliminatedTeamIds = eliminatedData.eliminated_teams
-            .filter(team => team.elimination_type === 'winner')
-            .map(team => team.id);
-        const loserEliminatedTeamIds = eliminatedData.eliminated_teams
-            .filter(team => team.elimination_type === 'loser')
-            .map(team => team.id);
+        const eliminatedTeamIds = eliminatedData.eliminated_teams.map(team => team.id);
         
         // Get team winner usage
         const teamUsageResponse = await fetch(`${API_BASE}/api/picks/team-usage?user_id=${currentUser.id}`);
@@ -572,11 +564,9 @@ async function loadMatchesForWeek(week) {
                 
                 const formattedDate = matchDate.toLocaleDateString('de-DE', dateOptions);
                 
-                // Check if teams are eliminated for specific types
-                const homeTeamWinnerEliminated = winnerEliminatedTeamIds.includes(match.home_team.id);
-                const awayTeamWinnerEliminated = winnerEliminatedTeamIds.includes(match.away_team.id);
-                const homeTeamLoserEliminated = loserEliminatedTeamIds.includes(match.home_team.id);
-                const awayTeamLoserEliminated = loserEliminatedTeamIds.includes(match.away_team.id);
+                // Check if teams are eliminated
+                const homeTeamEliminated = eliminatedTeamIds.includes(match.home_team.id);
+                const awayTeamEliminated = eliminatedTeamIds.includes(match.away_team.id);
                 
                 // NEW RULE: Check if teams have been used as losers
                 const homeTeamUsedAsLoser = loserUsageTeamIds.includes(match.home_team.id);
@@ -587,37 +577,31 @@ async function loadMatchesForWeek(week) {
                 const homeTeamUsage = teamUsageMap[match.home_team.id];
                 
                 // Determine team status classes and titles
-                const getTeamStatusInfo = (team, teamUsage, teamWinnerEliminated, teamLoserEliminated, teamUsedAsLoser, isOpposingTeam = false) => {
-                    // CORRECT LOGIC: Check if this team would be the LOSER and is loser-eliminated
-                    if (isOpposingTeam && teamLoserEliminated) {
-                        return { class: 'eliminated', title: 'Dieses Team kann nicht mehr als Verlierer gewählt werden (bereits 1x als Verlierer verwendet)', disabled: true };
+                const getTeamStatusInfo = (team, teamUsage, teamEliminated, teamUsedAsLoser, isOpposingTeam = false) => {
+                    if (teamEliminated) {
+                        return { class: 'eliminated', title: 'Dieses Team wurde bereits eliminiert', disabled: true };
                     }
-                    
-                    // CORRECT LOGIC: Check if this team would be the WINNER and is winner-eliminated (2x usage)
-                    if (!isOpposingTeam && teamWinnerEliminated) {
-                        return { class: 'eliminated', title: 'Dieses Team kann nicht mehr als Sieger gewählt werden (bereits 2x als Sieger verwendet)', disabled: true };
-                    }
-                    
-                    // Check usage count for winners (2x max)
-                    if (!isOpposingTeam && teamUsage && teamUsage.usage_count >= 2) {
+                    if (teamUsage && teamUsage.usage_count >= 2) {
                         return { class: 'max-used', title: 'Dieses Team wurde bereits 2x als Gewinner gewählt (Maximum erreicht)', disabled: true };
                     }
-                    
-                    // Show usage count for completed games
+                    // NEW RULE: If this team would be the loser (opposing team) and has been used as loser before
+                    if (isOpposingTeam && teamUsedAsLoser) {
+                        return { class: 'used-as-loser', title: 'Dieses Team wurde bereits als Verlierer getippt und kann nicht mehr als Verlierer gewählt werden', disabled: true };
+                    }
+                    // FIXED: Only show usage count for completed games
                     if (match.is_completed && teamUsage && teamUsage.usage_count === 1) {
                         return { class: 'used-once', title: 'Dieses Team wurde bereits 1x als Gewinner gewählt', disabled: false };
                     }
-                    
                     return { class: '', title: '', disabled: false };
                 };
                 
-                // For away team selection (away team = WINNER, home team = LOSER)
-                const awayTeamStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamWinnerEliminated, awayTeamLoserEliminated, awayTeamUsedAsLoser, false);
-                const awayTeamOpposingStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamWinnerEliminated, homeTeamLoserEliminated, homeTeamUsedAsLoser, true);
+                // For away team selection, home team would be the loser
+                const awayTeamStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamEliminated, awayTeamUsedAsLoser);
+                const awayTeamOpposingStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamEliminated, homeTeamUsedAsLoser, true);
                 
-                // For home team selection (home team = WINNER, away team = LOSER)
-                const homeTeamStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamWinnerEliminated, homeTeamLoserEliminated, homeTeamUsedAsLoser, false);
-                const homeTeamOpposingStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamWinnerEliminated, awayTeamLoserEliminated, awayTeamUsedAsLoser, true);
+                // For home team selection, away team would be the loser  
+                const homeTeamStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamEliminated, homeTeamUsedAsLoser);
+                const homeTeamOpposingStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamEliminated, awayTeamUsedAsLoser, true);
                 
                 // Determine if teams can be selected
                 const awayTeamDisabled = isMatchDisabled || awayTeamStatus.disabled || awayTeamOpposingStatus.disabled || isGameStarted;
@@ -629,32 +613,41 @@ async function loadMatchesForWeek(week) {
                             <div class="match-date">${formattedDate}</div>
                             ${isGameStarted ? '<div class="game-started-info">Spiel bereits gestartet</div>' : ''}
                         </div>
-                        <div class="match-button ${isGameStarted ? 'disabled' : ''}" 
-                             data-match-id="${match.id}"
-                             data-away-team-id="${match.away_team.id}"
-                             data-home-team-id="${match.home_team.id}"
-                             data-away-team-name="${match.away_team.name}"
-                             data-home-team-name="${match.home_team.name}"
-                             data-away-team-logo="${match.away_team.logo_url}"
-                             data-home-team-logo="${match.home_team.logo_url}">
-                            <div class="match-teams-display">
-                                <div class="team-display ${selectedTeamId === match.away_team.id ? 'selected' : ''}">
-                                    <img src="${match.away_team.logo_url}" alt="${match.away_team.name}" class="team-logo-large">
-                                    <div class="team-name">${match.away_team.name}</div>
-                                    ${selectedTeamId === match.away_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
-                                    ${match.is_completed && match.winner_team && match.winner_team.id === match.away_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
-                                    ${awayTeamUsage && awayTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${awayTeamUsage.usage_count}</div>` : ''}
-                                </div>
-                                
-                                <div class="match-vs">@</div>
-                                
-                                <div class="team-display ${selectedTeamId === match.home_team.id ? 'selected' : ''}">
-                                    <img src="${match.home_team.logo_url}" alt="${match.home_team.name}" class="team-logo-large">
-                                    <div class="team-name">${match.home_team.name}</div>
-                                    ${selectedTeamId === match.home_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
-                                    ${match.is_completed && match.winner_team && match.winner_team.id === match.home_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
-                                    ${homeTeamUsage && homeTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${homeTeamUsage.usage_count}</div>` : ''}
-                                </div>
+                        <div class="match-teams">
+                            <div class="match-team ${awayTeamStatus.class} ${selectedTeamId === match.away_team.id ? 'selected' : ''} ${awayTeamDisabled ? 'disabled' : ''}"
+                                 data-team-id="${match.away_team.id}"
+                                 data-match-id="${match.id}"
+                                 data-team-name="${match.away_team.name}"
+                                 data-disabled="${awayTeamDisabled}"
+                                 ${awayTeamEliminated ? `title="Dieses Team wurde bereits eliminiert"` : 
+                                   (awayTeamStatus.title ? `title="${awayTeamStatus.title}"` : 
+                                   (awayTeamOpposingStatus.title ? `title="${awayTeamOpposingStatus.title}"` : ''))}>
+                                <img src="${match.away_team.logo_url}" alt="${match.away_team.name}" class="match-team-logo team-logo-large">
+                                <div class="match-team-name">${match.away_team.name}</div>
+                                ${awayTeamUsedAsLoser ? '<div class="loser-indicator">L</div>' : ''}
+                                ${selectedTeamId === match.away_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
+                                ${match.is_completed && match.winner_team && match.winner_team.id === match.away_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
+                                ${match.is_completed && awayTeamUsage && awayTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${awayTeamUsage.usage_count}x</div>` : ''}
+                            </div>
+                            
+                            <div class="match-vs">
+                                @
+                            </div>
+                            
+                            <div class="match-team ${homeTeamStatus.class} ${selectedTeamId === match.home_team.id ? 'selected' : ''} ${homeTeamDisabled ? 'disabled' : ''}"
+                                 data-team-id="${match.home_team.id}"
+                                 data-match-id="${match.id}"
+                                 data-team-name="${match.home_team.name}"
+                                 data-disabled="${homeTeamDisabled}"
+                                 ${homeTeamEliminated ? `title="Dieses Team wurde bereits eliminiert"` : 
+                                   (homeTeamStatus.title ? `title="${homeTeamStatus.title}"` : 
+                                   (homeTeamOpposingStatus.title ? `title="${homeTeamOpposingStatus.title}"` : ''))}>
+                                <img src="${match.home_team.logo_url}" alt="${match.home_team.name}" class="match-team-logo team-logo-large">
+                                <div class="match-team-name">${match.home_team.name}</div>
+                                ${homeTeamUsedAsLoser ? '<div class="loser-indicator">L</div>' : ''}
+                                ${selectedTeamId === match.home_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
+                                ${match.is_completed && match.winner_team && match.winner_team.id === match.home_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
+                                ${match.is_completed && homeTeamUsage && homeTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${homeTeamUsage.usage_count}x</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -664,8 +657,8 @@ async function loadMatchesForWeek(week) {
         
         document.getElementById('matches-container').innerHTML = matchesHtml;
         
-        // Add click event listeners to match buttons
-        addMatchClickListeners();
+        // Add click event listeners to team boxes
+        addTeamClickListeners();
     } catch (error) {
         console.error('Error loading matches for week:', error);
         document.getElementById('matches-container').innerHTML = 'Fehler beim Laden der Matches';
@@ -674,282 +667,43 @@ async function loadMatchesForWeek(week) {
     }
 }
 
-// Add click event listeners to match buttons
-function addMatchClickListeners() {
+// Add click event listeners to team boxes
+function addTeamClickListeners() {
+    // Add a small delay to ensure DOM elements are fully rendered
     setTimeout(() => {
-        const matchButtons = document.querySelectorAll('.match-button');
-        console.log('Adding click listeners to', matchButtons.length, 'match buttons');
+        const teamBoxes = document.querySelectorAll('.match-team');
+        console.log('Adding click listeners to', teamBoxes.length, 'team boxes');
         
-        matchButtons.forEach(button => {
-            button.onclick = null;
+        teamBoxes.forEach(box => {
+            // Remove any existing listeners first
+            box.onclick = null;
             
-            button.addEventListener('click', function() {
-                if (this.classList.contains('disabled')) {
-                    showToast('warning', 'Spiel bereits gestartet - keine Picks mehr möglich');
+            box.addEventListener('click', function() {
+                console.log('Team clicked:', this.dataset.teamName);
+                
+                // NEW RULE: Check if team is disabled
+                const isDisabled = this.dataset.disabled === 'true' || this.classList.contains('disabled');
+                
+                if (isDisabled) {
+                    // Show tooltip or warning for disabled teams
+                    const title = this.getAttribute('title');
+                    if (title) {
+                        showToast('warning', title);
+                    }
                     return;
                 }
                 
                 const matchId = this.dataset.matchId;
-                const awayTeamId = this.dataset.awayTeamId;
-                const homeTeamId = this.dataset.homeTeamId;
-                const awayTeamName = this.dataset.awayTeamName;
-                const homeTeamName = this.dataset.homeTeamName;
-                const awayTeamLogo = this.dataset.awayTeamLogo;
-                const homeTeamLogo = this.dataset.homeTeamLogo;
+                const teamId = this.dataset.teamId;
+                const teamName = this.dataset.teamName;
                 
-                openPickModal({
-                    matchId,
-                    awayTeam: { id: awayTeamId, name: awayTeamName, logo: awayTeamLogo },
-                    homeTeam: { id: homeTeamId, name: homeTeamName, logo: homeTeamLogo }
-                });
+                console.log('Calling selectMatchWinner with:', {matchId, teamId, teamName});
+                selectMatchWinner(matchId, teamId, teamName);
             });
         });
         
-        console.log('Successfully added click listeners to', matchButtons.length, 'match buttons');
-    }, 100);
-}
-
-// Pick Modal Functionality
-let currentPickData = null;
-let selectedTeamId = null;
-
-// Initialize pick modal
-function initializePickModal() {
-    const modal = document.getElementById('pick-modal');
-    const closeBtn = modal.querySelector('.pick-modal-close');
-    const cancelBtn = document.getElementById('pick-modal-cancel');
-    const confirmBtn = document.getElementById('pick-modal-confirm');
-    
-    // Close modal handlers
-    closeBtn.addEventListener('click', closePickModal);
-    cancelBtn.addEventListener('click', closePickModal);
-    
-    // Click outside to close
-    window.addEventListener('click', function(event) {
-        if (event.target === modal) {
-            closePickModal();
-        }
-    });
-    
-    // Confirm pick
-    confirmBtn.addEventListener('click', confirmPick);
-}
-
-// Open pick modal
-async function openPickModal(matchData) {
-    if (!currentUser) {
-        showToast('warning', 'Bitte logge dich ein, um Picks zu machen');
-        return;
-    }
-    
-    currentPickData = matchData;
-    selectedTeamId = null;
-    
-    // Update modal title and match info
-    document.getElementById('pick-modal-title').textContent = `Pick für Week ${currentWeek}`;
-    document.getElementById('pick-modal-match-info').textContent = 
-        `${matchData.awayTeam.name} @ ${matchData.homeTeam.name}`;
-    
-    // Get elimination data for this user
-    try {
-        const eliminationResponse = await fetch(`${API_BASE}/api/picks/eliminated?user_id=${currentUser.id}`);
-        const eliminationData = await eliminationResponse.json();
-        
-        const teamUsageResponse = await fetch(`${API_BASE}/api/picks/team-usage?user_id=${currentUser.id}`);
-        const teamUsageData = await teamUsageResponse.json();
-        
-        // Create team options
-        createTeamOptions(matchData, eliminationData, teamUsageData);
-        
-        // Show modal
-        document.getElementById('pickModal').style.display = 'block';
-        
-    } catch (error) {
-        console.error('Error loading elimination data:', error);
-        showToast('error', 'Fehler beim Laden der Team-Daten');
-    }
-}
-
-// Create team options in modal
-function createTeamOptions(matchData, eliminationData, teamUsageData) {
-    const teamOptionsContainer = document.getElementById('pick-modal-team-options');
-    
-    // Get elimination data
-    const winnerEliminatedTeamIds = eliminationData.eliminated_teams
-        .filter(team => team.elimination_type === 'winner')
-        .map(team => team.id);
-    const loserEliminatedTeamIds = eliminationData.eliminated_teams
-        .filter(team => team.elimination_type === 'loser')
-        .map(team => team.id);
-    
-    // Get team usage data
-    const teamUsageMap = {};
-    teamUsageData.team_usage.forEach(usage => {
-        teamUsageMap[usage.team_id] = usage;
-    });
-    
-    // Check team availability
-    const awayTeamAvailability = checkTeamAvailability(
-        matchData.awayTeam, matchData.homeTeam, 
-        winnerEliminatedTeamIds, loserEliminatedTeamIds, teamUsageMap
-    );
-    
-    const homeTeamAvailability = checkTeamAvailability(
-        matchData.homeTeam, matchData.awayTeam,
-        winnerEliminatedTeamIds, loserEliminatedTeamIds, teamUsageMap
-    );
-    
-    // Create HTML for team options
-    let optionsHtml = '';
-    
-    // Away team option
-    optionsHtml += createTeamOptionHtml(
-        matchData.awayTeam, awayTeamAvailability, teamUsageMap[matchData.awayTeam.id]
-    );
-    
-    // Home team option
-    optionsHtml += createTeamOptionHtml(
-        matchData.homeTeam, homeTeamAvailability, teamUsageMap[matchData.homeTeam.id]
-    );
-    
-    teamOptionsContainer.innerHTML = optionsHtml;
-    
-    // Add event listeners to radio buttons
-    const radioButtons = teamOptionsContainer.querySelectorAll('input[type="radio"]');
-    radioButtons.forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (this.checked) {
-                selectedTeamId = parseInt(this.value);
-                updateConfirmButton();
-            }
-        });
-    });
-    
-    updateConfirmButton();
-}
-
-// Check team availability for selection
-function checkTeamAvailability(winnerTeam, loserTeam, winnerEliminatedIds, loserEliminatedIds, teamUsageMap) {
-    const winnerUsage = teamUsageMap[winnerTeam.id] || { usage_count: 0 };
-    
-    // Check if winner team is eliminated as winner (2x usage)
-    if (winnerEliminatedIds.includes(winnerTeam.id) || winnerUsage.usage_count >= 2) {
-        return {
-            available: false,
-            reason: 'Dieses Team kann nicht mehr als Sieger gewählt werden (bereits 2x als Sieger verwendet)',
-            type: 'winner-eliminated'
-        };
-    }
-    
-    // Check if loser team is eliminated as loser (1x usage)
-    if (loserEliminatedIds.includes(loserTeam.id)) {
-        return {
-            available: false,
-            reason: `${loserTeam.name} bereits als Verlierer eliminiert`,
-            type: 'loser-eliminated'
-        };
-    }
-    
-    // Team is available
-    return {
-        available: true,
-        reason: '',
-        type: 'available',
-        usage: winnerUsage.usage_count
-    };
-}
-
-// Create HTML for team option
-function createTeamOptionHtml(team, availability, teamUsage) {
-    const isDisabled = !availability.available;
-    const usageCount = teamUsage ? teamUsage.usage_count : 0;
-    
-    let statusHtml = '';
-    let statusClass = '';
-    
-    if (!availability.available) {
-        statusHtml = `<div class="team-status error">${availability.reason}</div>`;
-        statusClass = 'disabled';
-    } else if (usageCount > 0) {
-        statusHtml = `<div class="team-status warning">Bereits ${usageCount}x als Sieger verwendet</div>`;
-        statusClass = 'warning';
-    }
-    
-    const usageIndicator = usageCount > 0 ? `<div class="team-usage-indicator">${usageCount}</div>` : '';
-    
-    return `
-        <div class="team-option ${statusClass}">
-            <input type="radio" 
-                   name="team-selection" 
-                   value="${team.id}" 
-                   id="team-${team.id}"
-                   ${isDisabled ? 'disabled' : ''}>
-            <img src="${team.logo}" alt="${team.name}" class="team-logo">
-            <div class="team-info">
-                <div class="team-name">${team.name}</div>
-                ${statusHtml}
-            </div>
-            ${usageIndicator}
-        </div>
-    `;
-}
-
-// Update confirm button state
-function updateConfirmButton() {
-    const confirmBtn = document.getElementById('pick-modal-confirm');
-    confirmBtn.disabled = selectedTeamId === null;
-}
-
-// Close pick modal
-function closePickModal() {
-    document.getElementById('pick-modal').style.display = 'none';
-    currentPickData = null;
-    selectedTeamId = null;
-}
-
-// Confirm pick
-async function confirmPick() {
-    if (!selectedTeamId || !currentPickData) {
-        return;
-    }
-    
-    const selectedTeam = selectedTeamId === parseInt(currentPickData.awayTeam.id) 
-        ? currentPickData.awayTeam 
-        : currentPickData.homeTeam;
-    
-    try {
-        showLoading();
-        
-        const response = await fetch(`${API_BASE}/api/picks`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                match_id: parseInt(currentPickData.matchId),
-                chosen_team_id: selectedTeamId,
-                user_id: currentUser.id
-            })
-        });
-        
-        if (response.ok) {
-            showToast('success', `${selectedTeam.name} als Gewinner ausgewählt!`);
-            closePickModal();
-            
-            // Reload picks data to show updated selection
-            if (document.getElementById('picks').style.display !== 'none') {
-                loadPicksData();
-            }
-        } else {
-            const errorData = await response.json();
-            showToast('error', errorData.error || 'Fehler beim Speichern des Picks');
-        }
-    } catch (error) {
-        console.error('Error saving pick:', error);
-        showToast('error', 'Fehler beim Speichern des Picks');
-    } finally {
-        hideLoading();
-    }
+        console.log('Successfully added click listeners to', teamBoxes.length, 'team boxes');
+    }, 100); // 100ms delay to ensure DOM is ready
 }
 
 // Select match winner
