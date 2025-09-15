@@ -1,0 +1,250 @@
+/* Pick Modal Styles */
+.pick-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.pick-modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pick-modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px 12px 0 0;
+    text-align: center;
+}
+
+.pick-modal-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+.pick-modal-header .match-info {
+    margin-top: 8px;
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
+.pick-modal-body {
+    padding: 30px;
+}
+
+.pick-question {
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #333;
+}
+
+.team-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.team-option {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.team-option:hover:not(.disabled) {
+    border-color: #667eea;
+    background: #f8f9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.team-option.disabled {
+    background: #f5f5f5;
+    border-color: #d0d0d0;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.team-option.disabled .team-name {
+    color: #999;
+}
+
+.team-option input[type="radio"] {
+    margin-right: 15px;
+    transform: scale(1.2);
+    accent-color: #667eea;
+}
+
+.team-option input[type="radio"]:disabled {
+    opacity: 0.5;
+}
+
+.team-logo {
+    width: 40px;
+    height: 40px;
+    margin-right: 15px;
+    border-radius: 50%;
+    object-fit: contain;
+}
+
+.team-info {
+    flex: 1;
+}
+
+.team-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.team-status {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.team-status.warning {
+    color: #f39c12;
+    font-weight: 500;
+}
+
+.team-status.error {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+.team-usage-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #f39c12;
+    color: white;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.pick-modal-footer {
+    padding: 20px 30px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.modal-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.modal-btn-cancel {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.modal-btn-cancel:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.modal-btn-confirm {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.modal-btn-confirm:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.modal-btn-confirm:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.pick-modal-close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 24px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.pick-modal-close:hover {
+    color: white;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .pick-modal-content {
+        margin: 5% auto;
+        width: 95%;
+    }
+    
+    .pick-modal-header,
+    .pick-modal-body,
+    .pick-modal-footer {
+        padding: 20px;
+    }
+    
+    .team-option {
+        padding: 12px;
+    }
+    
+    .team-logo {
+        width: 35px;
+        height: 35px;
+        margin-right: 12px;
+    }
+    
+    .team-name {
+        font-size: 1em;
+    }
+}
+

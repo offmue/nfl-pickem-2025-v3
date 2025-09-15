@@ -1,0 +1,464 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "Manuel",
+      "score": 0
+    },
+    {
+      "id": 2,
+      "username": "Daniel",
+      "score": 1
+    },
+    {
+      "id": 3,
+      "username": "Raff",
+      "score": 1
+    },
+    {
+      "id": 4,
+      "username": "Haunschi",
+      "score": 1
+    }
+  ],
+  "teams": [
+    {
+      "id": 1,
+      "name": "Arizona Cardinals"
+    },
+    {
+      "id": 2,
+      "name": "Atlanta Falcons"
+    },
+    {
+      "id": 3,
+      "name": "Baltimore Ravens"
+    },
+    {
+      "id": 4,
+      "name": "Buffalo Bills"
+    },
+    {
+      "id": 5,
+      "name": "Carolina Panthers"
+    },
+    {
+      "id": 6,
+      "name": "Chicago Bears"
+    },
+    {
+      "id": 7,
+      "name": "Cincinnati Bengals"
+    },
+    {
+      "id": 8,
+      "name": "Cleveland Browns"
+    },
+    {
+      "id": 9,
+      "name": "Dallas Cowboys"
+    },
+    {
+      "id": 10,
+      "name": "Denver Broncos"
+    },
+    {
+      "id": 11,
+      "name": "Detroit Lions"
+    },
+    {
+      "id": 12,
+      "name": "Green Bay Packers"
+    },
+    {
+      "id": 13,
+      "name": "Houston Texans"
+    },
+    {
+      "id": 14,
+      "name": "Indianapolis Colts"
+    },
+    {
+      "id": 15,
+      "name": "Jacksonville Jaguars"
+    },
+    {
+      "id": 16,
+      "name": "Kansas City Chiefs"
+    },
+    {
+      "id": 17,
+      "name": "Las Vegas Raiders"
+    },
+    {
+      "id": 18,
+      "name": "Los Angeles Chargers"
+    },
+    {
+      "id": 19,
+      "name": "Los Angeles Rams"
+    },
+    {
+      "id": 20,
+      "name": "Miami Dolphins"
+    },
+    {
+      "id": 21,
+      "name": "Minnesota Vikings"
+    },
+    {
+      "id": 22,
+      "name": "New England Patriots"
+    },
+    {
+      "id": 23,
+      "name": "New Orleans Saints"
+    },
+    {
+      "id": 24,
+      "name": "New York Giants"
+    },
+    {
+      "id": 25,
+      "name": "New York Jets"
+    },
+    {
+      "id": 26,
+      "name": "Philadelphia Eagles"
+    },
+    {
+      "id": 27,
+      "name": "Pittsburgh Steelers"
+    },
+    {
+      "id": 28,
+      "name": "San Francisco 49ers"
+    },
+    {
+      "id": 29,
+      "name": "Seattle Seahawks"
+    },
+    {
+      "id": 30,
+      "name": "Tampa Bay Buccaneers"
+    },
+    {
+      "id": 31,
+      "name": "Tennessee Titans"
+    },
+    {
+      "id": 32,
+      "name": "Washington Commanders"
+    }
+  ],
+  "matches": [
+    {
+      "id": 1,
+      "week": 1,
+      "home_team": "Philadelphia Eagles",
+      "away_team": "Dallas Cowboys",
+      "winner_team": "Philadelphia Eagles",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 2,
+      "week": 1,
+      "home_team": "Los Angeles Chargers",
+      "away_team": "Kansas City Chiefs",
+      "winner_team": "Los Angeles Chargers",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 3,
+      "week": 1,
+      "home_team": "Atlanta Falcons",
+      "away_team": "Tampa Bay Buccaneers",
+      "winner_team": "Tampa Bay Buccaneers",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 4,
+      "week": 1,
+      "home_team": "Cleveland Browns",
+      "away_team": "Cincinnati Bengals",
+      "winner_team": "Cincinnati Bengals",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 5,
+      "week": 1,
+      "home_team": "Indianapolis Colts",
+      "away_team": "Miami Dolphins",
+      "winner_team": "Indianapolis Colts",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 6,
+      "week": 1,
+      "home_team": "Jacksonville Jaguars",
+      "away_team": "Carolina Panthers",
+      "winner_team": "Jacksonville Jaguars",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 7,
+      "week": 1,
+      "home_team": "New England Patriots",
+      "away_team": "Las Vegas Raiders",
+      "winner_team": "Las Vegas Raiders",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 8,
+      "week": 1,
+      "home_team": "New Orleans Saints",
+      "away_team": "Arizona Cardinals",
+      "winner_team": "Arizona Cardinals",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 9,
+      "week": 1,
+      "home_team": "New York Jets",
+      "away_team": "Pittsburgh Steelers",
+      "winner_team": "Pittsburgh Steelers",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 10,
+      "week": 1,
+      "home_team": "Washington Commanders",
+      "away_team": "New York Giants",
+      "winner_team": "Washington Commanders",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 11,
+      "week": 1,
+      "home_team": "Denver Broncos",
+      "away_team": "Tennessee Titans",
+      "winner_team": "Denver Broncos",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 12,
+      "week": 1,
+      "home_team": "Seattle Seahawks",
+      "away_team": "San Francisco 49ers",
+      "winner_team": "San Francisco 49ers",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 13,
+      "week": 1,
+      "home_team": "Green Bay Packers",
+      "away_team": "Detroit Lions",
+      "winner_team": "Green Bay Packers",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 14,
+      "week": 1,
+      "home_team": "Los Angeles Rams",
+      "away_team": "Houston Texans",
+      "winner_team": "Los Angeles Rams",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 15,
+      "week": 1,
+      "home_team": "Buffalo Bills",
+      "away_team": "Baltimore Ravens",
+      "winner_team": "Buffalo Bills",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 16,
+      "week": 1,
+      "home_team": "Chicago Bears",
+      "away_team": "Minnesota Vikings",
+      "winner_team": "Minnesota Vikings",
+      "completed": true,
+      "result": null,
+      "start_time": "2025-09-07 13:00:00"
+    },
+    {
+      "id": 17,
+      "week": 2,
+      "home_team": "Green Bay Packers",
+      "away_team": "Washington Commanders",
+      "winner_team": null,
+      "completed": false,
+      "result": null,
+      "start_time": "2025-09-14 13:00:00"
+    },
+    {
+      "id": 18,
+      "week": 2,
+      "home_team": "Baltimore Ravens",
+      "away_team": "Cleveland Browns",
+      "winner_team": null,
+      "completed": false,
+      "result": null,
+      "start_time": "2025-09-14 13:00:00"
+    },
+    {
+      "id": 19,
+      "week": 2,
+      "home_team": "Cincinnati Bengals",
+      "away_team": "Jacksonville Jaguars",
+      "winner_team": null,
+      "completed": false,
+      "result": null,
+      "start_time": "2025-09-14 13:00:00"
+    },
+    {
+      "id": 20,
+      "week": 2,
+      "home_team": "Dallas Cowboys",
+      "away_team": "New York Giants",
+      "winner_team": null,
+      "completed": false,
+      "result": null,
+      "start_time": "2025-09-14 13:00:00"
+    }
+  ],
+  "picks": [
+    {
+      "id": 1,
+      "user": "Manuel",
+      "week": 1,
+      "chosen_team": "Atlanta Falcons",
+      "is_correct": false,
+      "match_description": "Tampa Bay Buccaneers @ Atlanta Falcons"
+    },
+    {
+      "id": 2,
+      "user": "Daniel",
+      "week": 1,
+      "chosen_team": "Denver Broncos",
+      "is_correct": true,
+      "match_description": "Tennessee Titans @ Denver Broncos"
+    },
+    {
+      "id": 3,
+      "user": "Raff",
+      "week": 1,
+      "chosen_team": "Cincinnati Bengals",
+      "is_correct": true,
+      "match_description": "Cincinnati Bengals @ Cleveland Browns"
+    },
+    {
+      "id": 4,
+      "user": "Haunschi",
+      "week": 1,
+      "chosen_team": "Washington Commanders",
+      "is_correct": true,
+      "match_description": "New York Giants @ Washington Commanders"
+    }
+  ],
+  "team_winner_usage": [
+    {
+      "user": "Manuel",
+      "team": "Atlanta Falcons",
+      "usage_count": 1,
+      "status": "1/2x"
+    },
+    {
+      "user": "Daniel",
+      "team": "Denver Broncos",
+      "usage_count": 1,
+      "status": "1/2x"
+    },
+    {
+      "user": "Raff",
+      "team": "Cincinnati Bengals",
+      "usage_count": 1,
+      "status": "1/2x"
+    },
+    {
+      "user": "Haunschi",
+      "team": "Washington Commanders",
+      "usage_count": 1,
+      "status": "1/2x"
+    }
+  ],
+  "team_loser_usage": [
+    {
+      "user": "Manuel",
+      "team": "Tampa Bay Buccaneers",
+      "week": 1,
+      "status": "ELIMINATED"
+    },
+    {
+      "user": "Daniel",
+      "team": "Tennessee Titans",
+      "week": 1,
+      "status": "ELIMINATED"
+    },
+    {
+      "user": "Raff",
+      "team": "Cleveland Browns",
+      "week": 1,
+      "status": "ELIMINATED"
+    },
+    {
+      "user": "Haunschi",
+      "team": "New York Giants",
+      "week": 1,
+      "status": "ELIMINATED"
+    }
+  ],
+  "eliminated_teams": [
+    {
+      "user": "Manuel",
+      "team": "Tampa Bay Buccaneers",
+      "elimination_type": "loser"
+    },
+    {
+      "user": "Daniel",
+      "team": "Tennessee Titans",
+      "elimination_type": "loser"
+    },
+    {
+      "user": "Raff",
+      "team": "Cleveland Browns",
+      "elimination_type": "loser"
+    },
+    {
+      "user": "Haunschi",
+      "team": "New York Giants",
+      "elimination_type": "loser"
+    }
+  ]
+}

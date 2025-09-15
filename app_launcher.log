@@ -1,0 +1,7 @@
+2025-09-14 20:45:10,202 - INFO - Successfully imported db_backup functions
+2025-09-14 20:45:10,203 - INFO - Starting NFL PickEm App Launcher
+2025-09-14 20:45:10,203 - INFO - Database backup created: db_backups/nfl_pickem_20250914_204510.db
+2025-09-14 20:45:10,204 - INFO - Starting database backup service
+2025-09-14 20:45:10,204 - INFO - Backup service started in background
+2025-09-14 20:45:10,204 - INFO - Starting Flask application
+2025-09-14 20:45:10,205 - INFO - Database backup created: db_backups/nfl_pickem_20250914_204510.db
