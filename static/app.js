@@ -7,18 +7,44 @@ let currentWeek = 2; // Default to week 2
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    const urlParams = new URLSearchParams(window.location.search);
+    const section = urlParams.get('section');
+    const week = urlParams.get('week');
+
+    initializeApp(section, week);
+
+    const hideCurrentPicksToggle = document.getElementById('hide-current-picks');
+    if (hideCurrentPicksToggle) {
+        hideCurrentPicksToggle.addEventListener('change', function() {
+            if (document.getElementById('all-picks-section').style.display !== 'none') {
+                loadAllPicksData();
+            }
+        });
+    }
 });
 
 // Initialize the app
-async function initializeApp() {
+async function initializeApp(section = null, week = null) {
     setupNavigation();
     setupModal();
     setupLoginForm();
-    initializePickModal(); // Add pick modal initialization
+    
+    // Initialize pick modal
+    initializePickModal();
+    
     await checkAuthStatus();
     await getCurrentWeek();
-    loadDashboardData();
+
+    if (section) {
+        showSection(section);
+        if (section === 'picks' && week) {
+            // Set the week parameter for picks section
+            currentWeek = parseInt(week) || currentWeek;
+            loadPicksData(week);
+        }
+    } else {
+        loadDashboardData();
+    }
 }
 
 // Set up navigation
@@ -30,23 +56,41 @@ function setupNavigation() {
     
     dashboardLink.addEventListener('click', function(e) {
         e.preventDefault();
+        updateURL('dashboard');
         showSection('dashboard');
     });
     
     picksLink.addEventListener('click', function(e) {
         e.preventDefault();
+        updateURL('picks', currentWeek);
         showSection('picks');
     });
     
     leaderboardLink.addEventListener('click', function(e) {
         e.preventDefault();
+        updateURL('leaderboard');
         showSection('leaderboard');
     });
     
     allPicksLink.addEventListener('click', function(e) {
         e.preventDefault();
+        updateURL('all-picks');
         showSection('all-picks');
     });
+}
+
+// Update URL parameters
+function updateURL(section, week = null) {
+    const url = new URL(window.location);
+    url.searchParams.set('section', section);
+    
+    if (week && section === 'picks') {
+        url.searchParams.set('week', week);
+    } else {
+        url.searchParams.delete('week');
+    }
+    
+    window.history.pushState({}, '', url);
 }
 
 // Show a specific section
@@ -434,9 +478,18 @@ async function loadPicksData(week = null) {
                 weekSelect.appendChild(option);
             });
             
-            // Add event listener to week selector
+            // Add event listener to week selector with URL update
             weekSelect.addEventListener('change', () => {
-                loadMatchesForWeek(weekSelect.value);
+                const selectedWeek = weekSelect.value;
+                
+                // Update URL parameters
+                const url = new URL(window.location);
+                url.searchParams.set('section', 'picks');
+                url.searchParams.set('week', selectedWeek);
+                window.history.pushState({}, '', url);
+                
+                // Load matches for selected week
+                loadMatchesForWeek(selectedWeek);
             });
             
             // Load matches for selected week
@@ -531,7 +584,7 @@ async function loadMatchesForWeek(week) {
         if (matchesData.matches.length === 0) {
             matchesHtml = '<p>Keine Matches für diese Woche gefunden</p>';
         } else {
-            // NEW RULE: Show info about one pick per week
+            // Show simplified rules and info
             if (hasWeekPick) {
                 matchesHtml += `
                     <div class="week-pick-info">
@@ -543,10 +596,29 @@ async function loadMatchesForWeek(week) {
                 matchesHtml += `
                     <div class="week-pick-info">
                         <h3>Wähle EINEN Pick für Woche ${week}</h3>
-                        <p>Du kannst nur ein Spiel pro Woche tippen. Wähle weise!</p>
+                        <p>Du kannst deinen Pick zwischen allen noch nicht gestarteten Spielen wechseln.</p>
                     </div>
                 `;
             }
+            
+            // Add clear rule descriptions
+            matchesHtml += `
+                <div class="pick-rules-simplified">
+                    <h4>Regeln:</h4>
+                    <div class="rule-item">
+                        <i class="fas fa-times-circle rule-icon"></i>
+                        <span>Teams die bereits als Verlierer gewählt wurden, können nicht noch einmal als Verlierer gewählt werden</span>
+                    </div>
+                    <div class="rule-item">
+                        <i class="fas fa-trophy rule-icon"></i>
+                        <span>Teams die bereits 2x als Gewinner gewählt wurden, können nicht noch einmal als Gewinner gewählt werden</span>
+                    </div>
+                    <div class="rule-item">
+                        <i class="fas fa-eye-slash rule-icon"></i>
+                        <span>Nicht verfügbare Teams werden ausgegraut dargestellt</span>
+                    </div>
+                </div>
+            `;
             
             matchesData.matches.forEach(match => {
                 // Check if user has a pick for this match
@@ -578,53 +650,28 @@ async function loadMatchesForWeek(week) {
                 const homeTeamLoserEliminated = loserEliminatedTeamIds.includes(match.home_team.id);
                 const awayTeamLoserEliminated = loserEliminatedTeamIds.includes(match.away_team.id);
                 
-                // NEW RULE: Check if teams have been used as losers
-                const homeTeamUsedAsLoser = loserUsageTeamIds.includes(match.home_team.id);
-                const awayTeamUsedAsLoser = loserUsageTeamIds.includes(match.away_team.id);
-                
                 // Get team usage status
                 const awayTeamUsage = teamUsageMap[match.away_team.id];
                 const homeTeamUsage = teamUsageMap[match.home_team.id];
                 
-                // Determine team status classes and titles
-                const getTeamStatusInfo = (team, teamUsage, teamWinnerEliminated, teamLoserEliminated, teamUsedAsLoser, isOpposingTeam = false) => {
-                    // CORRECT LOGIC: Check if this team would be the LOSER and is loser-eliminated
-                    if (isOpposingTeam && teamLoserEliminated) {
-                        return { class: 'eliminated', title: 'Dieses Team kann nicht mehr als Verlierer gewählt werden (bereits 1x als Verlierer verwendet)', disabled: true };
-                    }
-                    
-                    // CORRECT LOGIC: Check if this team would be the WINNER and is winner-eliminated (2x usage)
-                    if (!isOpposingTeam && teamWinnerEliminated) {
-                        return { class: 'eliminated', title: 'Dieses Team kann nicht mehr als Sieger gewählt werden (bereits 2x als Sieger verwendet)', disabled: true };
-                    }
-                    
-                    // Check usage count for winners (2x max)
-                    if (!isOpposingTeam && teamUsage && teamUsage.usage_count >= 2) {
-                        return { class: 'max-used', title: 'Dieses Team wurde bereits 2x als Gewinner gewählt (Maximum erreicht)', disabled: true };
-                    }
-                    
-                    // Show usage count for completed games
-                    if (match.is_completed && teamUsage && teamUsage.usage_count === 1) {
-                        return { class: 'used-once', title: 'Dieses Team wurde bereits 1x als Gewinner gewählt', disabled: false };
-                    }
-                    
-                    return { class: '', title: '', disabled: false };
-                };
+                // Simplified team availability logic
+                const isAwayTeamAvailable = !isGameStarted && 
+                    !awayTeamWinnerEliminated && 
+                    !homeTeamLoserEliminated && 
+                    !(awayTeamUsage && awayTeamUsage.usage_count >= 2);
                 
-                // For away team selection (away team = WINNER, home team = LOSER)
-                const awayTeamStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamWinnerEliminated, awayTeamLoserEliminated, awayTeamUsedAsLoser, false);
-                const awayTeamOpposingStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamWinnerEliminated, homeTeamLoserEliminated, homeTeamUsedAsLoser, true);
+                const isHomeTeamAvailable = !isGameStarted && 
+                    !homeTeamWinnerEliminated && 
+                    !awayTeamLoserEliminated && 
+                    !(homeTeamUsage && homeTeamUsage.usage_count >= 2);
                 
-                // For home team selection (home team = WINNER, away team = LOSER)
-                const homeTeamStatus = getTeamStatusInfo(match.home_team, homeTeamUsage, homeTeamWinnerEliminated, homeTeamLoserEliminated, homeTeamUsedAsLoser, false);
-                const homeTeamOpposingStatus = getTeamStatusInfo(match.away_team, awayTeamUsage, awayTeamWinnerEliminated, awayTeamLoserEliminated, awayTeamUsedAsLoser, true);
-                
-                // Determine if teams can be selected
-                const awayTeamDisabled = isMatchDisabled || awayTeamStatus.disabled || awayTeamOpposingStatus.disabled || isGameStarted;
-                const homeTeamDisabled = isMatchDisabled || homeTeamStatus.disabled || homeTeamOpposingStatus.disabled || isGameStarted;
+                // Determine CSS classes for graying out unavailable teams
+                const awayTeamClass = isAwayTeamAvailable ? '' : 'team-unavailable';
+                const homeTeamClass = isHomeTeamAvailable ? '' : 'team-unavailable';
+                const matchButtonClass = (isAwayTeamAvailable || isHomeTeamAvailable) ? '' : 'match-disabled';
                 
                 matchesHtml += `
-                    <div class="match-card ${isMatchDisabled ? 'match-disabled' : ''} ${isGameStarted ? 'game-started' : ''}" data-match-id="${match.id}">
+                    <div class="match-card ${matchButtonClass} ${isGameStarted ? 'game-started' : ''}" data-match-id="${match.id}">
                         <div class="match-header">
                             <div class="match-date">${formattedDate}</div>
                             ${isGameStarted ? '<div class="game-started-info">Spiel bereits gestartet</div>' : ''}
@@ -638,22 +685,22 @@ async function loadMatchesForWeek(week) {
                              data-away-team-logo="${match.away_team.logo_url}"
                              data-home-team-logo="${match.home_team.logo_url}">
                             <div class="match-teams-display">
-                                <div class="team-display ${selectedTeamId === match.away_team.id ? 'selected' : ''}">
+                                <div class="team-display ${selectedTeamId === match.away_team.id ? 'selected' : ''} ${awayTeamClass}">
                                     <img src="${match.away_team.logo_url}" alt="${match.away_team.name}" class="team-logo-large">
                                     <div class="team-name">${match.away_team.name}</div>
                                     ${selectedTeamId === match.away_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
                                     ${match.is_completed && match.winner_team && match.winner_team.id === match.away_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
-                                    ${awayTeamUsage && awayTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${awayTeamUsage.usage_count}</div>` : ''}
+                                    ${!isAwayTeamAvailable ? '<div class="unavailable-overlay">Nicht verfügbar</div>' : ''}
                                 </div>
                                 
                                 <div class="match-vs">@</div>
                                 
-                                <div class="team-display ${selectedTeamId === match.home_team.id ? 'selected' : ''}">
+                                <div class="team-display ${selectedTeamId === match.home_team.id ? 'selected' : ''} ${homeTeamClass}">
                                     <img src="${match.home_team.logo_url}" alt="${match.home_team.name}" class="team-logo-large">
                                     <div class="team-name">${match.home_team.name}</div>
                                     ${selectedTeamId === match.home_team.id ? '<div class="pick-indicator"><i class="fas fa-check"></i></div>' : ''}
                                     ${match.is_completed && match.winner_team && match.winner_team.id === match.home_team.id ? '<div class="winner-indicator"><i class="fas fa-trophy"></i></div>' : ''}
-                                    ${homeTeamUsage && homeTeamUsage.usage_count > 0 ? `<div class="usage-indicator">${homeTeamUsage.usage_count}</div>` : ''}
+                                    ${!isHomeTeamAvailable ? '<div class="unavailable-overlay">Nicht verfügbar</div>' : ''}
                                 </div>
                             </div>
                         </div>
@@ -664,8 +711,10 @@ async function loadMatchesForWeek(week) {
         
         document.getElementById('matches-container').innerHTML = matchesHtml;
         
-        // Add click event listeners to match buttons
-        addMatchClickListeners();
+        // Use event delegation for match buttons
+        setupMatchButtonEventDelegation();
+
+
     } catch (error) {
         console.error('Error loading matches for week:', error);
         document.getElementById('matches-container').innerHTML = 'Fehler beim Laden der Matches';
@@ -674,39 +723,46 @@ async function loadMatchesForWeek(week) {
     }
 }
 
-// Add click event listeners to match buttons
-function addMatchClickListeners() {
-    setTimeout(() => {
-        const matchButtons = document.querySelectorAll('.match-button');
-        console.log('Adding click listeners to', matchButtons.length, 'match buttons');
-        
-        matchButtons.forEach(button => {
-            button.onclick = null;
-            
-            button.addEventListener('click', function() {
-                if (this.classList.contains('disabled')) {
-                    showToast('warning', 'Spiel bereits gestartet - keine Picks mehr möglich');
-                    return;
-                }
-                
-                const matchId = this.dataset.matchId;
-                const awayTeamId = this.dataset.awayTeamId;
-                const homeTeamId = this.dataset.homeTeamId;
-                const awayTeamName = this.dataset.awayTeamName;
-                const homeTeamName = this.dataset.homeTeamName;
-                const awayTeamLogo = this.dataset.awayTeamLogo;
-                const homeTeamLogo = this.dataset.homeTeamLogo;
-                
-                openPickModal({
-                    matchId,
-                    awayTeam: { id: awayTeamId, name: awayTeamName, logo: awayTeamLogo },
-                    homeTeam: { id: homeTeamId, name: homeTeamName, logo: homeTeamLogo }
-                });
-            });
-        });
-        
-        console.log('Successfully added click listeners to', matchButtons.length, 'match buttons');
-    }, 100);
+// Setup event delegation for match buttons
+function setupMatchButtonEventDelegation() {
+    const matchesContainer = document.getElementById('matches-container');
+    
+    // Remove any existing event listeners
+    matchesContainer.removeEventListener('click', handleMatchButtonClick);
+    
+    // Add event delegation
+    matchesContainer.addEventListener('click', handleMatchButtonClick);
+}
+
+// Handle match button clicks with event delegation
+function handleMatchButtonClick(event) {
+    const matchButton = event.target.closest('.match-button');
+    
+    if (!matchButton || matchButton.classList.contains('disabled')) {
+        return;
+    }
+    
+    if (!currentUser) {
+        showToast('warning', 'Bitte logge dich ein, um Picks zu machen');
+        return;
+    }
+    
+    const matchId = matchButton.dataset.matchId;
+    const awayTeamId = matchButton.dataset.awayTeamId;
+    const homeTeamId = matchButton.dataset.homeTeamId;
+    const awayTeamName = matchButton.dataset.awayTeamName;
+    const homeTeamName = matchButton.dataset.homeTeamName;
+    const awayTeamLogo = matchButton.dataset.awayTeamLogo;
+    const homeTeamLogo = matchButton.dataset.homeTeamLogo;
+
+    const weekSelect = document.getElementById('week-select');
+    const week = weekSelect ? weekSelect.value : currentWeek;
+
+    openPickModal({
+        matchId,
+        awayTeam: { id: awayTeamId, name: awayTeamName, logo: awayTeamLogo },
+        homeTeam: { id: homeTeamId, name: homeTeamName, logo: homeTeamLogo }
+    }, week);
 }
 
 // Pick Modal Functionality
@@ -749,7 +805,7 @@ function initializePickModal() {
 }
 
 // Open pick modal
-async function openPickModal(matchData) {
+async function openPickModal(matchData, week) {
     if (!currentUser) {
         showToast('warning', 'Bitte logge dich ein, um Picks zu machen');
         return;
@@ -763,7 +819,7 @@ async function openPickModal(matchData) {
     const selectedWeek = weekSelect ? weekSelect.value : currentWeek;
     
     // Update modal title and match info
-    document.getElementById('pick-modal-title').textContent = `Pick für Week ${selectedWeek}`;
+    document.getElementById('pick-modal-title').textContent = `Pick für Week ${week}`;
     document.getElementById('pick-modal-match-info').textContent = 
         `${matchData.awayTeam.name} @ ${matchData.homeTeam.name}`;
     
@@ -779,7 +835,7 @@ async function openPickModal(matchData) {
         createTeamOptions(matchData, eliminationData, teamUsageData);
         
         // Show modal
-        document.getElementById('pickModal').style.display = 'block';
+        document.getElementById('pick-modal').style.display = 'block';
         
     } catch (error) {
         console.error('Error loading elimination data:', error);
@@ -787,7 +843,7 @@ async function openPickModal(matchData) {
     }
 }
 
-// Create team options in modal
+// Create team options in modal (simplified)
 function createTeamOptions(matchData, eliminationData, teamUsageData) {
     const teamOptionsContainer = document.getElementById('pick-modal-team-options');
     
@@ -805,29 +861,50 @@ function createTeamOptions(matchData, eliminationData, teamUsageData) {
         teamUsageMap[usage.team_id] = usage;
     });
     
-    // Check team availability
-    const awayTeamAvailability = checkTeamAvailability(
-        matchData.awayTeam, matchData.homeTeam, 
-        winnerEliminatedTeamIds, loserEliminatedTeamIds, teamUsageMap
-    );
+    // Simplified availability check for away team (as winner)
+    const awayTeamUsage = teamUsageMap[matchData.awayTeam.id];
+    const isAwayTeamAvailable = !winnerEliminatedTeamIds.includes(parseInt(matchData.awayTeam.id)) && 
+                               !loserEliminatedTeamIds.includes(parseInt(matchData.homeTeam.id)) && 
+                               !(awayTeamUsage && awayTeamUsage.usage_count >= 2);
     
-    const homeTeamAvailability = checkTeamAvailability(
-        matchData.homeTeam, matchData.awayTeam,
-        winnerEliminatedTeamIds, loserEliminatedTeamIds, teamUsageMap
-    );
+    // Simplified availability check for home team (as winner)
+    const homeTeamUsage = teamUsageMap[matchData.homeTeam.id];
+    const isHomeTeamAvailable = !winnerEliminatedTeamIds.includes(parseInt(matchData.homeTeam.id)) && 
+                               !loserEliminatedTeamIds.includes(parseInt(matchData.awayTeam.id)) && 
+                               !(homeTeamUsage && homeTeamUsage.usage_count >= 2);
     
-    // Create HTML for team options
-    let optionsHtml = '';
-    
-    // Away team option
-    optionsHtml += createTeamOptionHtml(
-        matchData.awayTeam, awayTeamAvailability, teamUsageMap[matchData.awayTeam.id]
-    );
-    
-    // Home team option
-    optionsHtml += createTeamOptionHtml(
-        matchData.homeTeam, homeTeamAvailability, teamUsageMap[matchData.homeTeam.id]
-    );
+    // Create simplified HTML for team options
+    let optionsHtml = `
+        <div class="team-option ${!isAwayTeamAvailable ? 'disabled' : ''}">
+            <input type="radio" 
+                   name="team-selection" 
+                   value="${matchData.awayTeam.id}" 
+                   id="team-${matchData.awayTeam.id}"
+                   ${!isAwayTeamAvailable ? 'disabled' : ''}>
+            <label for="team-${matchData.awayTeam.id}" class="team-option-label">
+                <img src="${matchData.awayTeam.logo}" alt="${matchData.awayTeam.name}" class="team-logo">
+                <div class="team-info">
+                    <div class="team-name">${matchData.awayTeam.name}</div>
+                    ${!isAwayTeamAvailable ? '<div class="team-status-simple">Nicht verfügbar</div>' : ''}
+                </div>
+            </label>
+        </div>
+        
+        <div class="team-option ${!isHomeTeamAvailable ? 'disabled' : ''}">
+            <input type="radio" 
+                   name="team-selection" 
+                   value="${matchData.homeTeam.id}" 
+                   id="team-${matchData.homeTeam.id}"
+                   ${!isHomeTeamAvailable ? 'disabled' : ''}>
+            <label for="team-${matchData.homeTeam.id}" class="team-option-label">
+                <img src="${matchData.homeTeam.logo}" alt="${matchData.homeTeam.name}" class="team-logo">
+                <div class="team-info">
+                    <div class="team-name">${matchData.homeTeam.name}</div>
+                    ${!isHomeTeamAvailable ? '<div class="team-status-simple">Nicht verfügbar</div>' : ''}
+                </div>
+            </label>
+        </div>
+    `;
     
     teamOptionsContainer.innerHTML = optionsHtml;
     
@@ -845,85 +922,12 @@ function createTeamOptions(matchData, eliminationData, teamUsageData) {
     updateConfirmButton();
 }
 
-// Check team availability for selection
-function checkTeamAvailability(winnerTeam, loserTeam, winnerEliminatedIds, loserEliminatedIds, teamUsageMap) {
-    const winnerUsage = teamUsageMap[winnerTeam.id] || { usage_count: 0 };
-    
-    // Check if winner team is eliminated as winner (2x usage)
-    if (winnerEliminatedIds.includes(winnerTeam.id) || winnerUsage.usage_count >= 2) {
-        return {
-            available: false,
-            reason: 'Dieses Team kann nicht mehr als Sieger gewählt werden (bereits 2x als Sieger verwendet)',
-            type: 'winner-eliminated'
-        };
-    }
-    
-    // NEW: Check if winner team is eliminated as loser (cannot be selected as winner)
-    if (loserEliminatedIds.includes(winnerTeam.id)) {
-        return {
-            available: false,
-            reason: 'Dieses Team kann nicht als Sieger gewählt werden (bereits als Verlierer eliminiert)',
-            type: 'loser-eliminated-as-winner'
-        };
-    }
-    
-    // Check if loser team is eliminated as loser (1x usage)
-    if (loserEliminatedIds.includes(loserTeam.id)) {
-        return {
-            available: false,
-            reason: `${loserTeam.name} bereits als Verlierer eliminiert`,
-            type: 'loser-eliminated'
-        };
-    }
-    
-    // Team is available
-    return {
-        available: true,
-        reason: '',
-        type: 'available',
-        usage: winnerUsage.usage_count
-    };
-}
-
-// Create HTML for team option
-function createTeamOptionHtml(team, availability, teamUsage) {
-    const isDisabled = !availability.available;
-    const usageCount = teamUsage ? teamUsage.usage_count : 0;
-    
-    let statusHtml = '';
-    let statusClass = '';
-    
-    if (!availability.available) {
-        statusHtml = `<div class="team-status error">${availability.reason}</div>`;
-        statusClass = 'disabled';
-    } else if (usageCount > 0) {
-        statusHtml = `<div class="team-status warning">Bereits ${usageCount}x als Sieger verwendet</div>`;
-        statusClass = 'warning';
-    }
-    
-    const usageIndicator = usageCount > 0 ? `<div class="team-usage-indicator">${usageCount}</div>` : '';
-    
-    return `
-        <div class="team-option ${statusClass}">
-            <input type="radio" 
-                   name="team-selection" 
-                   value="${team.id}" 
-                   id="team-${team.id}"
-                   ${isDisabled ? 'disabled' : ''}>
-            <img src="${team.logo}" alt="${team.name}" class="team-logo">
-            <div class="team-info">
-                <div class="team-name">${team.name}</div>
-                ${statusHtml}
-            </div>
-            ${usageIndicator}
-        </div>
-    `;
-}
-
 // Update confirm button state
 function updateConfirmButton() {
     const confirmBtn = document.getElementById('pick-modal-confirm');
-    confirmBtn.disabled = selectedTeamId === null;
+    if (confirmBtn) {
+        confirmBtn.disabled = selectedTeamId === null;
+    }
 }
 
 // Close pick modal
@@ -1307,15 +1311,5 @@ function showToast(type, message) {
 }
 
 // Add event listener for privacy toggle
-document.addEventListener('DOMContentLoaded', function() {
-    const hideCurrentPicksToggle = document.getElementById('hide-current-picks');
-    if (hideCurrentPicksToggle) {
-        hideCurrentPicksToggle.addEventListener('change', function() {
-            // Reload all picks when toggle changes
-            if (document.getElementById('all-picks-section').style.display !== 'none') {
-                loadAllPicksData();
-            }
-        });
-    }
-});
+
 
