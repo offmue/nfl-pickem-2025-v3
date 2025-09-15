@@ -12,11 +12,11 @@ import threading
 import subprocess
 import logging
 
-# Configure logging
+# Configure logging with deployment compatibility - console only
 logging.basicConfig(
-    filename='app_launcher.log',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
 )
 
 # Import db_backup functions

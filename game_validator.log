@@ -2,3 +2,23 @@
 2025-09-14 06:31:34,421 - INFO - Successfully fetched ESPN data for Week 2
 2025-09-14 06:31:34,423 - ERROR - Database error finding matching game: no such table: matches
 2025-09-14 06:31:34,424 - INFO - No new completed games found for Week 2
+2025-09-14 11:27:03,286 - INFO - Test log message
+2025-09-14 12:59:29,254 - INFO - Starting validation for Week 2
+2025-09-14 12:59:29,486 - INFO - Successfully fetched ESPN data for Week 2
+2025-09-14 12:59:29,488 - ERROR - Database error finding matching game: no such column: home_team
+2025-09-14 12:59:29,489 - INFO - No new completed games found for Week 2
+2025-09-14 13:01:32,945 - INFO - Starting validation for Week 2
+2025-09-14 13:01:33,106 - INFO - Successfully fetched ESPN data for Week 2
+2025-09-14 13:01:33,110 - ERROR - Database error updating match 17: no such column: result
+2025-09-14 13:01:33,110 - INFO - No new completed games found for Week 2
+2025-09-14 13:02:25,517 - INFO - Starting validation for Week 2
+2025-09-14 13:02:25,693 - INFO - Successfully fetched ESPN data for Week 2
+2025-09-14 13:02:25,696 - INFO - Updated match 17: Green Bay Packers 27 - 18
+2025-09-14 13:02:25,696 - INFO - Updated points for Week 2
+2025-09-14 13:02:25,697 - ERROR - Error validating Week 2: name 'winner' is not defined
+2025-09-14 13:03:22,161 - INFO - Starting validation for Week 2
+2025-09-14 13:03:22,310 - INFO - Successfully fetched ESPN data for Week 2
+2025-09-14 13:03:22,313 - INFO - Updated match 17: Green Bay Packers 27 - 18
+2025-09-14 13:03:22,313 - INFO - Updated points for Week 2
+2025-09-14 13:03:22,314 - INFO - Updated team eliminations for Week 2
+2025-09-14 13:03:22,314 - INFO - Successfully validated Week 2: 1 games updated

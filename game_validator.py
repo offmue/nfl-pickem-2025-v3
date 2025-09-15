@@ -14,21 +14,47 @@ import time
 import schedule
 import threading
 
-# Configure logging
+# Configure logging with maximum deployment compatibility
+import os
+import logging
+
+# Simple console-only logging for deployment compatibility
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/home/ubuntu/nfl-pickem-final-corrected/game_validator.log'),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
 class NFLGameValidator:
     """Validates NFL game results and updates the database"""
     
-    def __init__(self, db_path: str = '/home/ubuntu/nfl-pickem-final-corrected/instance/nfl_pickem.db'):
+    def __init__(self, db_path: str = None):
+        # Use relative path for Render compatibility
+        if db_path is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Try multiple possible database locations
+            possible_paths = [
+                os.path.join(current_dir, 'instance', 'nfl_pickem.db'),
+                os.path.join(current_dir, 'nfl_pickem.db'),
+                'instance/nfl_pickem.db',
+                'nfl_pickem.db'
+            ]
+            
+            db_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    db_path = path
+                    break
+            
+            # If no database found, use the first path (will be created if needed)
+            if db_path is None:
+                db_path = possible_paths[0]
+                # Ensure instance directory exists
+                instance_dir = os.path.dirname(db_path)
+                if not os.path.exists(instance_dir):
+                    os.makedirs(instance_dir, exist_ok=True)
+        
         self.db_path = db_path
         self.espn_base_url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl"
         
@@ -37,6 +63,12 @@ class NFLGameValidator:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
+    
+    def row_to_dict(self, row) -> dict:
+        """Convert sqlite3.Row to dictionary for safe .get() access"""
+        if row is None:
+            return {}
+        return dict(row)
     
     def get_espn_scoreboard(self, week: int, year: int = 2025) -> Optional[Dict]:
         """Get ESPN scoreboard data for a specific week"""
@@ -100,16 +132,17 @@ class NFLGameValidator:
             if not all([home_team, away_team, home_score is not None, away_score is not None]):
                 return None
             
-            # Determine winner
-            winner = home_team if home_score > away_score else away_team
+            # Determine winner team ID (we'll need to look this up)
+            winner_name = home_team if home_score > away_score else away_team
             
             return {
                 'home_team': home_team,
                 'away_team': away_team,
                 'home_score': home_score,
                 'away_score': away_score,
-                'winner': winner,
-                'result': f"{winner} {max(home_score, away_score)} - {min(home_score, away_score)}"
+                'winner_name': winner_name,
+                'winner_team_id': None,  # Will be set later
+                'result': f"{winner_name} {max(home_score, away_score)} - {min(home_score, away_score)}"
             }
             
         except Exception as e:
@@ -121,19 +154,29 @@ class NFLGameValidator:
         try:
             cursor = conn.cursor()
             
+            # Safely extract required data
+            winner_team_id = result_data.get('winner_team_id')
+            home_score = result_data.get('home_score')
+            away_score = result_data.get('away_score')
+            result_text = result_data.get('result', 'Unknown result')
+            
+            if winner_team_id is None or home_score is None or away_score is None:
+                logger.warning(f"Missing required data for match {match_id}: winner_id={winner_team_id}, home={home_score}, away={away_score}")
+                return False
+            
             # Update the match with result
             cursor.execute("""
-                UPDATE matches 
-                SET result = ?, completed = 1, winner = ?
+                UPDATE match 
+                SET is_completed = 1, winner_team_id = ?, home_score = ?, away_score = ?
                 WHERE id = ?
-            """, (result_data['result'], result_data['winner'], match_id))
+            """, (winner_team_id, home_score, away_score, match_id))
             
             if cursor.rowcount == 0:
                 logger.warning(f"No match found with ID {match_id}")
                 return False
             
             conn.commit()
-            logger.info(f"Updated match {match_id}: {result_data['result']}")
+            logger.info(f"Updated match {match_id}: {result_text}")
             return True
             
         except sqlite3.Error as e:
@@ -148,40 +191,50 @@ class NFLGameValidator:
             
             # Get all completed matches for the week
             cursor.execute("""
-                SELECT id, winner, home_team, away_team
-                FROM matches 
-                WHERE week = ? AND completed = 1
+                SELECT m.id, m.winner_team_id, ht.name as home_team, at.name as away_team
+                FROM match m
+                JOIN team ht ON m.home_team_id = ht.id
+                JOIN team at ON m.away_team_id = at.id
+                WHERE m.week = ? AND m.is_completed = 1
             """, (week,))
             
             completed_matches = cursor.fetchall()
             
             for match in completed_matches:
-                match_id = match['id']
-                winner = match['winner']
+                match_dict = self.row_to_dict(match)
+                match_id = match_dict.get('id')
+                winner_team_id = match_dict.get('winner_team_id')
+                
+                if match_id is None or winner_team_id is None:
+                    logger.warning(f"Missing match data: id={match_id}, winner_id={winner_team_id}")
+                    continue
                 
                 # Get all picks for this match
                 cursor.execute("""
-                    SELECT p.id, p.user_id, p.predicted_winner, u.username
-                    FROM picks p
-                    JOIN users u ON p.user_id = u.id
+                    SELECT p.id, p.user_id, p.chosen_team_id, u.username
+                    FROM pick p
+                    JOIN user u ON p.user_id = u.id
                     WHERE p.match_id = ?
                 """, (match_id,))
                 
                 picks = cursor.fetchall()
                 
                 for pick in picks:
+                    # Safely extract pick data
+                    pick_dict = self.row_to_dict(pick)
+                    chosen_team_id = pick_dict.get('chosen_team_id')
+                    username = pick_dict.get('username', 'Unknown')
+                    
+                    if chosen_team_id is None:
+                        logger.warning(f"Missing chosen_team_id for pick")
+                        continue
+                    
                     # Check if prediction was correct
-                    is_correct = pick['predicted_winner'] == winner
+                    is_correct = chosen_team_id == winner_team_id
                     points = 1 if is_correct else 0
                     
-                    # Update pick with result
-                    cursor.execute("""
-                        UPDATE picks 
-                        SET is_correct = ?, points = ?
-                        WHERE id = ?
-                    """, (is_correct, points, pick['id']))
-                    
-                    logger.info(f"User {pick['username']}: {pick['predicted_winner']} -> {'✅' if is_correct else '❌'} ({points} points)")
+                    # Log the result (no database update needed for is_correct/points)
+                    logger.info(f"User {username}: Team ID {chosen_team_id} -> {'✅' if is_correct else '❌'} ({points} points)")
             
             conn.commit()
             logger.info(f"Updated points for Week {week}")
@@ -197,67 +250,125 @@ class NFLGameValidator:
             
             # Get all completed matches for the week
             cursor.execute("""
-                SELECT id, winner, home_team, away_team
-                FROM matches 
-                WHERE week = ? AND completed = 1
+                SELECT m.id, m.winner_team_id, ht.name as home_team, at.name as away_team
+                FROM match m
+                JOIN team ht ON m.home_team_id = ht.id
+                JOIN team at ON m.away_team_id = at.id
+                WHERE m.week = ? AND m.is_completed = 1
             """, (week,))
             
             completed_matches = cursor.fetchall()
             
             for match in completed_matches:
-                winner = match['winner']
-                loser = match['home_team'] if match['away_team'] == winner else match['away_team']
+                match_dict = self.row_to_dict(match)
+                winner_team_id = match_dict.get('winner_team_id')
+                home_team = match_dict.get('home_team')
+                away_team = match_dict.get('away_team')
+                
+                if not all([winner_team_id, home_team, away_team]):
+                    logger.warning(f"Missing match data: winner_id={winner_team_id}, home={home_team}, away={away_team}")
+                    continue
+                
+                # Determine loser team name
+                if winner_team_id:
+                    # Get winner team name to determine loser
+                    cursor.execute("SELECT name FROM team WHERE id = ?", (winner_team_id,))
+                    winner_result = cursor.fetchone()
+                    if not winner_result:
+                        logger.warning(f"Could not find team with ID {winner_team_id}")
+                        continue
+                    winner_dict = self.row_to_dict(winner_result)
+                    winner_name = winner_dict.get('name')
+                    if not winner_name:
+                        logger.warning(f"Missing team name for ID {winner_team_id}")
+                        continue
+                    loser = home_team if away_team == winner_name else away_team
+                else:
+                    continue  # Skip if no winner determined
                 
                 # Get all picks for this match where users picked the losing team
+                match_id = match_dict.get('id')
+                if not match_id:
+                    logger.warning("Missing match ID")
+                    continue
+                    
                 cursor.execute("""
-                    SELECT p.user_id, p.predicted_winner, u.username
-                    FROM picks p
-                    JOIN users u ON p.user_id = u.id
-                    WHERE p.match_id = ? AND p.predicted_winner = ?
-                """, (match['id'], loser))
+                    SELECT p.user_id, t.name as chosen_team_name, u.username
+                    FROM pick p
+                    JOIN user u ON p.user_id = u.id
+                    JOIN team t ON p.chosen_team_id = t.id
+                    WHERE p.match_id = ? AND t.name = ?
+                """, (match_id, loser))
                 
                 losing_picks = cursor.fetchall()
                 
                 for pick in losing_picks:
+                    # Safely extract pick data
+                    pick_dict = self.row_to_dict(pick)
+                    user_id = pick_dict.get('user_id')
+                    username = pick_dict.get('username', 'Unknown')
+                    
+                    if user_id is None:
+                        logger.warning("Missing user_id in losing pick")
+                        continue
+                    
                     # Add team to eliminated teams for this user (as loser)
                     cursor.execute("""
-                        INSERT OR IGNORE INTO eliminated_teams (user_id, team_name, elimination_type)
-                        VALUES (?, ?, 'loser')
-                    """, (pick['user_id'], loser))
+                        INSERT OR IGNORE INTO eliminated_team (user_id, team_id, elimination_type)
+                        VALUES (?, (SELECT id FROM team WHERE name = ?), 'loser')
+                    """, (user_id, loser))
                     
-                    logger.info(f"Eliminated {loser} as loser for user {pick['username']}")
+                    logger.info(f"Eliminated {loser} as loser for user {username}")
                 
                 # Update team winner usage count
                 cursor.execute("""
-                    SELECT user_id FROM picks 
-                    WHERE match_id = ? AND predicted_winner = ?
-                """, (match['id'], winner))
+                    SELECT p.user_id FROM pick p
+                    JOIN team t ON p.chosen_team_id = t.id
+                    WHERE p.match_id = ? AND t.name = ?
+                """, (match_id, winner_name))
                 
                 winner_picks = cursor.fetchall()
                 
                 for pick in winner_picks:
-                    # Update or insert team winner usage
-                    cursor.execute("""
-                        INSERT INTO team_winner_usage (user_id, team_name, usage_count)
-                        VALUES (?, ?, 1)
-                        ON CONFLICT(user_id, team_name) 
-                        DO UPDATE SET usage_count = usage_count + 1
-                    """, (pick['user_id'], winner))
-                    
-                    # Check if team should be eliminated as winner (used 2 times)
+                    # Safely extract user_id
+                    pick_dict = self.row_to_dict(pick)
+                    user_id = pick_dict.get('user_id')
+                    if user_id is None:
+                        logger.warning("Missing user_id in winner pick")
+                        continue
+                    # Check if usage already exists
                     cursor.execute("""
                         SELECT usage_count FROM team_winner_usage
-                        WHERE user_id = ? AND team_name = ?
-                    """, (pick['user_id'], winner))
+                        WHERE user_id = ? AND team_id = (SELECT id FROM team WHERE name = ?)
+                    """, (user_id, winner_name))
                     
-                    usage = cursor.fetchone()
-                    if usage and usage['usage_count'] >= 2:
+                    existing = cursor.fetchone()
+                    if existing:
+                        # Update existing usage
                         cursor.execute("""
-                            INSERT OR IGNORE INTO eliminated_teams (user_id, team_name, elimination_type)
-                            VALUES (?, ?, 'winner')
-                        """, (pick['user_id'], winner))
+                            UPDATE team_winner_usage 
+                            SET usage_count = usage_count + 1
+                            WHERE user_id = ? AND team_id = (SELECT id FROM team WHERE name = ?)
+                        """, (user_id, winner_name))
+                        existing_dict = self.row_to_dict(existing)
+                        existing_count = existing_dict.get('usage_count', 0)
+                        new_count = existing_count + 1
+                    else:
+                        # Insert new usage
+                        cursor.execute("""
+                            INSERT INTO team_winner_usage (user_id, team_id, usage_count)
+                            VALUES (?, (SELECT id FROM team WHERE name = ?), 1)
+                        """, (user_id, winner_name))
+                        new_count = 1
+                    
+                    # Check if team should be eliminated as winner (used 2 times)
+                    if new_count >= 2:
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO eliminated_team (user_id, team_id, elimination_type)
+                            VALUES (?, (SELECT id FROM team WHERE name = ?), 'winner')
+                        """, (user_id, winner_name))
                         
-                        logger.info(f"Eliminated {winner} as winner for user (2x usage limit)")
+                        logger.info(f"Eliminated {winner_name} as winner for user (2x usage limit)")
             
             conn.commit()
             logger.info(f"Updated team eliminations for Week {week}")
@@ -271,13 +382,20 @@ class NFLGameValidator:
         try:
             cursor = conn.cursor()
             
-            home_team = espn_game['home_team']
-            away_team = espn_game['away_team']
+            # Safely extract team names with fallback
+            home_team = espn_game.get('home_team')
+            away_team = espn_game.get('away_team')
+            
+            if not home_team or not away_team:
+                logger.warning(f"Missing team names in ESPN data: home={home_team}, away={away_team}")
+                return None
             
             # Try exact match first
             cursor.execute("""
-                SELECT id FROM matches 
-                WHERE week = ? AND home_team = ? AND away_team = ?
+                SELECT m.id FROM match m
+                JOIN team ht ON m.home_team_id = ht.id
+                JOIN team at ON m.away_team_id = at.id
+                WHERE m.week = ? AND ht.name = ? AND at.name = ?
             """, (week, home_team, away_team))
             
             result = cursor.fetchone()
@@ -286,8 +404,10 @@ class NFLGameValidator:
             
             # Try fuzzy matching (in case team names differ slightly)
             cursor.execute("""
-                SELECT id, home_team, away_team FROM matches 
-                WHERE week = ? AND completed = 0
+                SELECT m.id, ht.name as home_team, at.name as away_team FROM match m
+                JOIN team ht ON m.home_team_id = ht.id
+                JOIN team at ON m.away_team_id = at.id
+                WHERE m.week = ? AND m.is_completed = 0
             """, (week,))
             
             matches = cursor.fetchall()
@@ -332,6 +452,21 @@ class NFLGameValidator:
                 # Find matching game in database
                 match_id = self.find_matching_game(conn, result_data, week)
                 if not match_id:
+                    continue
+                
+                # Look up winner team ID
+                cursor = conn.cursor()
+                winner_name = result_data.get('winner_name')
+                if not winner_name:
+                    logger.warning("Missing winner_name in result data")
+                    continue
+                    
+                cursor.execute("SELECT id FROM team WHERE name = ?", (winner_name,))
+                winner_team = cursor.fetchone()
+                if winner_team:
+                    result_data['winner_team_id'] = winner_team['id']
+                else:
+                    logger.warning(f"Could not find team ID for winner: {winner_name}")
                     continue
                 
                 # Update game result
@@ -384,7 +519,7 @@ class NFLGameValidator:
             # Get all weeks with incomplete games
             cursor.execute("""
                 SELECT DISTINCT week 
-                FROM matches 
+                FROM match 
                 WHERE completed = 0 AND week <= 18
                 ORDER BY week
             """)
@@ -408,33 +543,49 @@ class NFLGameValidator:
 # Scheduler functions
 def run_validation_service():
     """Run the validation service with scheduled tasks"""
-    validator = NFLGameValidator()
-    
-    # Schedule validation tasks
-    schedule.every(30).minutes.do(validator.validate_current_week)  # Every 30 minutes during games
-    schedule.every().day.at("00:00").do(validator.validate_all_incomplete_weeks)  # Daily at midnight
-    schedule.every().tuesday.at("02:00").do(validator.validate_all_incomplete_weeks)  # Tuesday 2 AM (after MNF)
-    
-    logger.info("NFL Game Validator Service started")
-    logger.info("Scheduled tasks:")
-    logger.info("- Every 30 minutes: Validate current week")
-    logger.info("- Daily at midnight: Validate all incomplete weeks")
-    logger.info("- Tuesday 2 AM: Final weekly validation")
-    
-    # Run initial validation
-    validator.validate_current_week()
-    
-    # Keep the service running
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every minute
+    try:
+        validator = NFLGameValidator()
+        
+        # Schedule validation tasks
+        schedule.every(30).minutes.do(validator.validate_current_week)  # Every 30 minutes during games
+        schedule.every().day.at("00:00").do(validator.validate_all_incomplete_weeks)  # Daily at midnight
+        schedule.every().tuesday.at("06:00").do(validator.validate_all_incomplete_weeks)  # Tuesday 6 AM (after MNF)
+        
+        logger.info("NFL Game Validator Service started")
+        logger.info("Scheduled tasks:")
+        logger.info("- Every 30 minutes: Validate current week")
+        logger.info("- Daily at midnight: Validate all incomplete weeks")
+        logger.info("- Tuesday 6 AM: Final weekly validation")
+        
+        # Run initial validation
+        try:
+            validator.validate_current_week()
+        except Exception as e:
+            logger.error(f"Error in initial validation: {e}")
+        
+        # Keep the service running
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(60)  # Check every minute
+            except Exception as e:
+                logger.error(f"Error in validation service loop: {e}")
+                time.sleep(60)  # Continue running even if there's an error
+                
+    except Exception as e:
+        logger.error(f"Fatal error in validation service: {e}")
+        raise
 
 def start_validation_service_thread():
     """Start the validation service in a background thread"""
-    thread = threading.Thread(target=run_validation_service, daemon=True)
-    thread.start()
-    logger.info("Validation service thread started")
-    return thread
+    try:
+        thread = threading.Thread(target=run_validation_service, daemon=True)
+        thread.start()
+        logger.info("Validation service thread started")
+        return thread
+    except Exception as e:
+        logger.error(f"Failed to start validation service thread: {e}")
+        return None
 
 if __name__ == "__main__":
     # Run as standalone service
@@ -448,7 +599,9 @@ if __name__ == "__main__":
         try:
             # Import the schedule update functionality
             import sys
-            sys.path.insert(0, '/home/ubuntu/nfl-pickem-final-corrected')
+            # Use relative path for Render compatibility
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            sys.path.insert(0, current_dir)
             from app import app, db, Match, Team
             
             with app.app_context():
@@ -568,12 +721,12 @@ class NFLGameValidatorService:
                     elif current_hour == 0 and current_minute == 0:
                         self.validator.validate_all_incomplete_weeks()
                     
-                    # Tuesday at 2 AM - final weekly validation
-                    elif current_weekday == 1 and current_hour == 2 and current_minute == 0:
+                    # Tuesday at 6 AM - final weekly validation (after Monday Night Football)
+                    elif current_weekday == 1 and current_hour == 6 and current_minute == 0:
                         self.validator.validate_all_incomplete_weeks()
                     
-                    # Tuesday at 3 AM - weekly schedule update
-                    elif current_weekday == 1 and current_hour == 3 and current_minute == 0:
+                    # Tuesday at 7 AM - weekly schedule update
+                    elif current_weekday == 1 and current_hour == 7 and current_minute == 0:
                         self.validator.update_weekly_schedule()
                     
                     time.sleep(60)  # Check every minute
@@ -590,8 +743,8 @@ class NFLGameValidatorService:
         self.logger.info("Scheduled tasks:")
         self.logger.info("- Every 30 minutes: Validate current week")
         self.logger.info("- Daily at midnight: Validate all incomplete weeks")
-        self.logger.info("- Tuesday 2 AM: Final weekly validation")
-        self.logger.info("- Tuesday 3 AM: Weekly schedule update")
+        self.logger.info("- Tuesday 6 AM: Final weekly validation (after Monday Night Football)")
+        self.logger.info("- Tuesday 7 AM: Weekly schedule update")
 
 # Global service instance
 validation_service = NFLGameValidatorService()

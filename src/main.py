@@ -104,44 +104,40 @@ class Match(db.Model):
     
     @property
     def is_game_started(self):
-        """Check if the game has started (corrected timezone handling)"""
-        import pytz
+        """Check if the game has started (in Vienna timezone)"""
         from datetime import datetime
+        import pytz
         
-        # Get current time in Vienna
         vienna_tz = pytz.timezone('Europe/Vienna')
         now_vienna = datetime.now(vienna_tz)
         
-        # Interpret stored time as US Eastern Time (not UTC!)
-        eastern_tz = pytz.timezone('US/Eastern')
-        
+        # Convert start_time to Vienna timezone if it's not already
         if self.start_time.tzinfo is None:
-            # Stored time is US Eastern Time without timezone info
-            start_time_eastern = eastern_tz.localize(self.start_time)
+            # Assume UTC if no timezone info
+            utc_tz = pytz.UTC
+            start_time_utc = utc_tz.localize(self.start_time)
         else:
-            # If timezone info exists, convert to Eastern first
-            start_time_eastern = self.start_time.astimezone(eastern_tz)
+            start_time_utc = self.start_time
             
-        # Convert to Vienna time for comparison
-        start_time_vienna = start_time_eastern.astimezone(vienna_tz)
+        start_time_vienna = start_time_utc.astimezone(vienna_tz)
         
         return now_vienna >= start_time_vienna
     
     @property
     def start_time_vienna(self):
-        """Get start time in Vienna timezone (corrected)"""
+        """Get start time in Vienna timezone"""
         import pytz
         
         vienna_tz = pytz.timezone('Europe/Vienna')
-        eastern_tz = pytz.timezone('US/Eastern')
         
         if self.start_time.tzinfo is None:
-            # Stored time is US Eastern Time
-            start_time_eastern = eastern_tz.localize(self.start_time)
+            # Assume UTC if no timezone info
+            utc_tz = pytz.UTC
+            start_time_utc = utc_tz.localize(self.start_time)
         else:
-            start_time_eastern = self.start_time.astimezone(eastern_tz)
+            start_time_utc = self.start_time
             
-        return start_time_eastern.astimezone(vienna_tz)
+        return start_time_utc.astimezone(vienna_tz)
     
     @winner.setter
     def winner(self, team_name):

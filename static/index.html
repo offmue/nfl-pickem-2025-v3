@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/timer.css">
     <link rel="stylesheet" href="/static/game-started.css">
+    <link rel="stylesheet" href="/static/pick-modal.css">
+    <link rel="stylesheet" href="/static/match-button.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
@@ -142,7 +144,29 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- Pick Modal -->
+    <div id="pickModal" class="pick-modal">
+        <div class="pick-modal-content">
+            <div class="pick-modal-header">
+                <span class="pick-modal-close">&times;</span>
+                <h3 id="pick-modal-title">Pick für Week 2</h3>
+                <div class="match-info" id="pick-modal-match-info">Cowboys @ Giants</div>
+            </div>
+            <div class="pick-modal-body">
+                <div class="pick-question">Wer wird gewinnen?</div>
+                <div class="team-options" id="pick-modal-team-options">
+                    <!-- Team options will be populated dynamically -->
+                </div>
+            </div>
+            <div class="pick-modal-footer">
+                <button class="modal-btn modal-btn-cancel" id="pick-modal-cancel">Abbrechen</button>
+                <button class="modal-btn modal-btn-confirm" id="pick-modal-confirm" disabled>Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/app.js"></script>
+    <script src="/static/pick-modal.js"></script>
     <script src="/static/timer.js"></script>
 </body>
 </html>
