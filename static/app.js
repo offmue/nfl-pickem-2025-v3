@@ -720,6 +720,17 @@ function initializePickModal() {
     const cancelBtn = document.getElementById('pick-modal-cancel');
     const confirmBtn = document.getElementById('pick-modal-confirm');
     
+    // Check if all elements exist
+    if (!modal || !closeBtn || !cancelBtn || !confirmBtn) {
+        console.error('Pick modal elements not found:', {
+            modal: !!modal,
+            closeBtn: !!closeBtn,
+            cancelBtn: !!cancelBtn,
+            confirmBtn: !!confirmBtn
+        });
+        return;
+    }
+    
     // Close modal handlers
     closeBtn.addEventListener('click', closePickModal);
     cancelBtn.addEventListener('click', closePickModal);
@@ -733,6 +744,8 @@ function initializePickModal() {
     
     // Confirm pick
     confirmBtn.addEventListener('click', confirmPick);
+    
+    console.log('Pick modal initialized successfully');
 }
 
 // Open pick modal
@@ -915,7 +928,14 @@ function updateConfirmButton() {
 
 // Close pick modal
 function closePickModal() {
-    document.getElementById('pick-modal').style.display = 'none';
+    console.log('closePickModal called');
+    const modal = document.getElementById('pick-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        console.log('Modal closed successfully');
+    } else {
+        console.error('Modal element not found');
+    }
     currentPickData = null;
     selectedTeamId = null;
 }
