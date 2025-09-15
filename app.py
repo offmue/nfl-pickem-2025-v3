@@ -925,6 +925,8 @@ def get_match_results():
 # Serve static files
 @app.route('/', defaults={'path': ''})
 @app.route('/picks')
+@app.route('/leaderboard')
+@app.route('/alle-picks')
 @app.route('/<path:path>')
 def serve_static(path):
     if path == '' or path == 'index.html':

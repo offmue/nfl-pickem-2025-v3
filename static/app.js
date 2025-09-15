@@ -745,8 +745,12 @@ async function openPickModal(matchData) {
     currentPickData = matchData;
     selectedTeamId = null;
     
+    // Get the currently selected week from the dropdown
+    const weekSelect = document.getElementById('week-select');
+    const selectedWeek = weekSelect ? weekSelect.value : currentWeek;
+    
     // Update modal title and match info
-    document.getElementById('pick-modal-title').textContent = `Pick für Week ${currentWeek}`;
+    document.getElementById('pick-modal-title').textContent = `Pick für Week ${selectedWeek}`;
     document.getElementById('pick-modal-match-info').textContent = 
         `${matchData.awayTeam.name} @ ${matchData.homeTeam.name}`;
     
@@ -838,6 +842,15 @@ function checkTeamAvailability(winnerTeam, loserTeam, winnerEliminatedIds, loser
             available: false,
             reason: 'Dieses Team kann nicht mehr als Sieger gewählt werden (bereits 2x als Sieger verwendet)',
             type: 'winner-eliminated'
+        };
+    }
+    
+    // NEW: Check if winner team is eliminated as loser (cannot be selected as winner)
+    if (loserEliminatedIds.includes(winnerTeam.id)) {
+        return {
+            available: false,
+            reason: 'Dieses Team kann nicht als Sieger gewählt werden (bereits als Verlierer eliminiert)',
+            type: 'loser-eliminated-as-winner'
         };
     }
     
