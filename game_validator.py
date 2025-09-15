@@ -182,13 +182,7 @@ class NFLGameValidator:
                     is_correct = pick['chosen_team_id'] == winner_team_id
                     points = 1 if is_correct else 0
                     
-                    # Update pick with result
-                    cursor.execute("""
-                        UPDATE picks 
-                        SET is_correct = ?, points = ?
-                        WHERE id = ?
-                    """, (is_correct, points, pick['id']))
-                    
+                    # Log the result (no database update needed for is_correct/points)
                     logger.info(f"User {pick['username']}: {pick['chosen_team_name']} -> {'✅' if is_correct else '❌'} ({points} points)")
             
             conn.commit()
@@ -242,8 +236,8 @@ class NFLGameValidator:
                 for pick in losing_picks:
                     # Add team to eliminated teams for this user (as loser)
                     cursor.execute("""
-                        INSERT OR IGNORE INTO eliminated_teams (user_id, team_name, elimination_type)
-                        VALUES (?, ?, 'loser')
+                        INSERT OR IGNORE INTO eliminated_team (user_id, team_id, elimination_type)
+                        VALUES (?, (SELECT id FROM team WHERE name = ?), 'loser')
                     """, (pick['user_id'], loser))
                     
                     logger.info(f"Eliminated {loser} as loser for user {pick['username']}")
@@ -258,25 +252,34 @@ class NFLGameValidator:
                 winner_picks = cursor.fetchall()
                 
                 for pick in winner_picks:
-                    # Update or insert team winner usage
-                    cursor.execute("""
-                        INSERT INTO team_winner_usage (user_id, team_name, usage_count)
-                        VALUES (?, ?, 1)
-                        ON CONFLICT(user_id, team_name) 
-                        DO UPDATE SET usage_count = usage_count + 1
-                    """, (pick['user_id'], winner_name))
-                    
-                    # Check if team should be eliminated as winner (used 2 times)
+                    # Check if usage already exists
                     cursor.execute("""
                         SELECT usage_count FROM team_winner_usage
-                        WHERE user_id = ? AND team_name = ?
+                        WHERE user_id = ? AND team_id = (SELECT id FROM team WHERE name = ?)
                     """, (pick['user_id'], winner_name))
                     
-                    usage = cursor.fetchone()
-                    if usage and usage['usage_count'] >= 2:
+                    existing = cursor.fetchone()
+                    if existing:
+                        # Update existing usage
                         cursor.execute("""
-                            INSERT OR IGNORE INTO eliminated_teams (user_id, team_name, elimination_type)
-                            VALUES (?, ?, 'winner')
+                            UPDATE team_winner_usage 
+                            SET usage_count = usage_count + 1
+                            WHERE user_id = ? AND team_id = (SELECT id FROM team WHERE name = ?)
+                        """, (pick['user_id'], winner_name))
+                        new_count = existing['usage_count'] + 1
+                    else:
+                        # Insert new usage
+                        cursor.execute("""
+                            INSERT INTO team_winner_usage (user_id, team_id, usage_count)
+                            VALUES (?, (SELECT id FROM team WHERE name = ?), 1)
+                        """, (pick['user_id'], winner_name))
+                        new_count = 1
+                    
+                    # Check if team should be eliminated as winner (used 2 times)
+                    if new_count >= 2:
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO eliminated_team (user_id, team_id, elimination_type)
+                            VALUES (?, (SELECT id FROM team WHERE name = ?), 'winner')
                         """, (pick['user_id'], winner_name))
                         
                         logger.info(f"Eliminated {winner_name} as winner for user (2x usage limit)")
