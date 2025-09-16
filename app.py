@@ -669,24 +669,16 @@ def get_eliminated_teams():
         eliminated_teams = EliminatedTeam.query.filter_by(user_id=user_id).all()
         
         eliminated_list = []
-        seen_teams = set()  # Track seen team+type combinations to prevent duplicates
-        
         for elim_team in eliminated_teams:
             team = db.session.get(Team, elim_team.team_id)
             if team:
-                # Create unique key for team+elimination_type combination
-                team_key = f"{team.id}_{elim_team.elimination_type}"
-                
-                # Only add if we haven't seen this team+type combination before
-                if team_key not in seen_teams:
-                    seen_teams.add(team_key)
-                    eliminated_list.append({
-                        'id': team.id,
-                        'name': team.name,
-                        'abbreviation': team.abbreviation,
-                        'logo_url': team.logo_url,
-                        'elimination_type': elim_team.elimination_type
-                    })
+                eliminated_list.append({
+                    'id': team.id,
+                    'name': team.name,
+                    'abbreviation': team.abbreviation,
+                    'logo_url': team.logo_url,
+                    'elimination_type': elim_team.elimination_type
+                })
         
         return jsonify({
             'eliminated_teams': eliminated_list
@@ -924,9 +916,6 @@ def get_match_results():
 
 # Serve static files
 @app.route('/', defaults={'path': ''})
-@app.route('/picks', defaults={'path': ''})
-@app.route('/leaderboard', defaults={'path': ''})
-@app.route('/alle-picks', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_static(path):
     if path == '' or path == 'index.html':
